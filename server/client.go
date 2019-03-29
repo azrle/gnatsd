@@ -463,7 +463,7 @@ func (c *client) readLoop() {
 
 		// Trace some special messages
 		if c.isTracingMsg(b[:n]) {
-			c.Noticef("->> read: [%s]", b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
+			c.Noticef("->> read state[%d]: [%s...%s]", c.state, b[:5], b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
 		}
 
 		// Main call into parser for inbound data. This will generate callouts
@@ -1632,6 +1632,11 @@ func (c *client) processMsg(msg []byte) {
 
 	if c.trace {
 		c.traceMsg(msg)
+	}
+
+	// Trace some special messages
+	if c.isTracingMsg(msg) {
+		c.Noticef("->> process msg: [%s...%s]", msg[:5], msg[len(msg)-LEN_CR_LF-tracerMsgSuffixLen:len(msg)-LEN_CR_LF])
 	}
 
 	// Check pub permissions (don't do this for routes)
