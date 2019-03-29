@@ -461,6 +461,11 @@ func (c *client) readLoop() {
 		c.in.bytes = 0
 		c.in.subs = 0
 
+		// Trace some special messages
+		if c.isTracingMsg(b[:n]) {
+			c.Noticef("->> Client[%d] read: [%s]", c.cid, b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
+		}
+
 		// Main call into parser for inbound data. This will generate callouts
 		// to process messages, etc.
 		if err := c.parse(b[:n]); err != nil {
@@ -479,11 +484,6 @@ func (c *client) readLoop() {
 			atomic.AddInt64(&c.inBytes, int64(c.in.bytes))
 			atomic.AddInt64(&s.inMsgs, int64(c.in.msgs))
 			atomic.AddInt64(&s.inBytes, int64(c.in.bytes))
-		}
-
-		// Trace some special messages
-		if c.isTracingMsg(b[:n]) {
-			c.Noticef("->> Client[%d] read: [%s]", c.cid, b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
 		}
 
 		// Budget to spend in place flushing outbound data.
