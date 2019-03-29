@@ -63,6 +63,12 @@ const (
 	shortsToShrink = 2
 )
 
+// For special message tracing
+const (
+	tracerMsgSuffixLen = 16
+	tracerPrefix       = "tracer"
+)
+
 // Represent client booleans with a bitmask
 type clientFlag byte
 
@@ -185,6 +191,7 @@ type outbound struct {
 	mp  int64         // snapshot of max pending.
 	fsp int           // Flush signals that are pending from readLoop's pcd.
 	lft time.Duration // Last flush time.
+	tps []int64       // Tracing Point (in bytes)
 }
 
 type perm struct {
@@ -474,6 +481,11 @@ func (c *client) readLoop() {
 			atomic.AddInt64(&s.inBytes, int64(c.in.bytes))
 		}
 
+		// Trace some special messages
+		if c.isTracingMsg(b[:n]) {
+			c.Noticef("->> Client[%d] read: [%s]", c.cid, b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
+		}
+
 		// Budget to spend in place flushing outbound data.
 		// Client will be checked on several fronts to see
 		// if applicable. Routes will never wait in place.
@@ -612,6 +624,18 @@ func (c *client) flushOutbound() bool {
 	// Update flush time statistics
 	c.out.lft = lft
 
+	// Trace some special messages
+	j := 0
+	for i, tp := range c.out.tps {
+		if n >= tp {
+			c.Noticef("->> Client[%d] flush outbound: tp[%d]", c.cid, tp)
+			j = i + 1
+		} else {
+			c.out.tps[i] -= n
+		}
+	}
+	c.out.tps = c.out.tps[j:]
+
 	// Subtract from pending bytes and messages.
 	c.out.pb -= n
 	c.out.pm -= apm // FIXME(dlc) - this will not be totally accurate.
@@ -700,6 +724,14 @@ func (c *client) flushOutbound() bool {
 // Lock must be held.
 func (c *client) flushSignal() {
 	c.out.sg.Signal()
+}
+
+func (c *client) isTracingMsg(msg []byte) bool {
+	// Check last tracerMsgSuffixLen bytes
+	if len(msg) >= tracerMsgSuffixLen && bytes.Index(msg[len(msg)-tracerMsgSuffixLen:], []byte(tracerPrefix)) > -1 {
+		return true
+	}
+	return false
 }
 
 func (c *client) traceMsg(msg []byte) {
@@ -1494,6 +1526,13 @@ func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
 	client.queueOutbound(msg)
 
 	client.out.pm++
+
+	// Trace some special messages
+	if c.isTracingMsg(msg) {
+		c.Noticef("->> Client[%d] outbound enqueued(pm[%d], tp[%d]): [%s]",
+			client.cid, client.out.pm, client.out.pb, string(msg[msgSize-tracerMsgSuffixLen:msgSize]))
+		client.out.tps = append(client.out.tps, client.out.pb)
+	}
 
 	// Check outbound threshold and queue IO flush if needed.
 	// This is specifically looking at situations where we are getting behind and may want
