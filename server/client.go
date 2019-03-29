@@ -463,7 +463,7 @@ func (c *client) readLoop() {
 
 		// Trace some special messages
 		if c.isTracingMsg(b[:n]) {
-			c.Noticef("->> Client[%d] read: [%s]", c.cid, b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
+			c.Noticef("->> read: [%s]", b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
 		}
 
 		// Main call into parser for inbound data. This will generate callouts
@@ -628,7 +628,7 @@ func (c *client) flushOutbound() bool {
 	j := 0
 	for i, tp := range c.out.tps {
 		if n >= tp {
-			c.Noticef("->> Client[%d] flush outbound: tp[%d]", c.cid, tp)
+			c.Noticef("->> outbound flushed: tp[%d]", tp)
 			j = i + 1
 		} else {
 			c.out.tps[i] -= n
@@ -1529,7 +1529,7 @@ func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
 
 	// Trace some special messages
 	if c.isTracingMsg(msg) {
-		c.Noticef("->> Client[%d] outbound enqueued(pm[%d], tp[%d]): [%s]",
+		c.Noticef("->> deliver to [%d] outbound (pm[%d], tp[%d]): [%s]",
 			client.cid, client.out.pm, client.out.pb, string(msg[msgSize-tracerMsgSuffixLen:msgSize]))
 		client.out.tps = append(client.out.tps, client.out.pb)
 	}
