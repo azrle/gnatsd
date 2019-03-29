@@ -463,7 +463,7 @@ func (c *client) readLoop() {
 
 		// Trace some special messages
 		if c.isTracingMsg(b[:n]) {
-			c.Noticef("->> read state[%d]: [%s...%s]", c.state, b[:5], b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
+			c.Noticef("->> read state[%d]: [%q...%q]", c.state, b[:5], b[n-tracerMsgSuffixLen-LEN_CR_LF:n-LEN_CR_LF])
 		}
 
 		// Main call into parser for inbound data. This will generate callouts
@@ -1529,7 +1529,7 @@ func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
 
 	// Trace some special messages
 	if c.isTracingMsg(msg) {
-		c.Noticef("->> deliver to [%d] outbound (pm[%d], tp[%d]): [%s]",
+		c.Noticef("->> deliver to [%d] outbound (pm[%d], tp[%d]): [%q]",
 			client.cid, client.out.pm, client.out.pb, string(msg[msgSize-tracerMsgSuffixLen:msgSize]))
 		client.out.tps = append(client.out.tps, client.out.pb)
 	}
@@ -1636,7 +1636,7 @@ func (c *client) processMsg(msg []byte) {
 
 	// Trace some special messages
 	if c.isTracingMsg(msg) {
-		c.Noticef("->> process msg: [%s...%s]", msg[:5], msg[len(msg)-LEN_CR_LF-tracerMsgSuffixLen:len(msg)-LEN_CR_LF])
+		c.Noticef("->> process msg: [%q...%q]", msg[:5], msg[len(msg)-LEN_CR_LF-tracerMsgSuffixLen:len(msg)-LEN_CR_LF])
 	}
 
 	// Check pub permissions (don't do this for routes)
