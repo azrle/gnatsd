@@ -65,7 +65,7 @@ const (
 
 // For special message tracing
 const (
-	tracerMsgSuffixLen = 16
+	tracerMsgSuffixLen = 32
 	tracerPrefix       = "tracer"
 )
 
