@@ -1478,7 +1478,7 @@ func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
 			for i := 1; i < len(timepoints); i++ {
 				logMsg += ", " + timepoints[i-1].name + "->" + timepoints[i].name + ": " + timepoints[i].t.Sub(timepoints[i-1].t).String()
 			}
-			c.Noticef("slow deliver msg: %s", logMsg)
+			c.Noticef("slow deliver msg to [%s]: %s", string(sub.subject), logMsg)
 		}
 	}()
 
@@ -1654,11 +1654,11 @@ func (c *client) processMsg(msg []byte) {
 		timepoints = append(timepoints, &timepoint{name: "end", t: time.Now()})
 		totalTime := timepoints[len(timepoints)-1].t.Sub(timepoints[0].t)
 		if totalTime.Nanoseconds() > slowMessageNanoseconds {
-			logMsg := fmt.Sprintf("total: %s", totalTime.String())
+			logMsg := "total: " + totalTime.String()
 			for i := 1; i < len(timepoints); i++ {
-				logMsg += fmt.Sprintf(", %s->%s: %s", timepoints[i-1].name, timepoints[i].name, timepoints[i].t.Sub(timepoints[i-1].t).String())
+				logMsg += ", " + timepoints[i-1].name + "->" + timepoints[i].name + ": " + timepoints[i].t.Sub(timepoints[i-1].t).String()
 			}
-			c.Noticef("slow process msg: %s", logMsg)
+			c.Noticef("slow deliver msg to [%s]: %s", string(c.pa.subject), logMsg)
 		}
 	}()
 	// Snapshot server.
