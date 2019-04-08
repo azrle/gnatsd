@@ -69,6 +69,8 @@ const (
 	tracerPrefix       = "tracer"
 )
 
+const slowMessageNanoseconds = 500000 // 0.5 ms
+
 // Represent client booleans with a bitmask
 type clientFlag byte
 
@@ -134,6 +136,11 @@ const (
 	RouteRemoved
 	ServerShutdown
 )
+
+type timepoint struct {
+	name string
+	t    time.Time
+}
 
 type client struct {
 	// Here first because of use of atomics, and memory alignment.
@@ -1461,12 +1468,27 @@ var needFlush = struct{}{}
 var routeSeen = struct{}{}
 
 func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
+	var timepoints []*timepoint
+	timepoints = append(timepoints, &timepoint{name: "begin", t: time.Now()})
+	defer func() {
+		timepoints = append(timepoints, &timepoint{name: "end", t: time.Now()})
+		totalTime := timepoints[len(timepoints)-1].t.Sub(timepoints[0].t)
+		if totalTime.Nanoseconds() > slowMessageNanoseconds {
+			logMsg := "total: " + totalTime.String()
+			for i := 1; i < len(timepoints); i++ {
+				logMsg += ", " + timepoints[i-1].name + "->" + timepoints[i].name + ": " + timepoints[i].t.Sub(timepoints[i-1].t).String()
+			}
+			c.Noticef("slow deliver msg: %s", logMsg)
+		}
+	}()
+
 	if sub.client == nil {
 		return false
 	}
 	client := sub.client
 	client.mu.Lock()
 
+	timepoints = append(timepoints, &timepoint{name: "locked", t: time.Now()})
 	// Check echo
 	if c == client && !client.echo {
 		client.mu.Unlock()
@@ -1525,6 +1547,8 @@ func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
 	client.queueOutbound(mh)
 	client.queueOutbound(msg)
 
+	timepoints = append(timepoints, &timepoint{name: "enqueued", t: time.Now()})
+
 	client.out.pm++
 
 	// Trace some special messages
@@ -1541,6 +1565,8 @@ func (c *client) deliverMsg(sub *subscription, mh, msg []byte) bool {
 	if client.out.pm > 1 && client.out.pb > maxBufSize*2 {
 		client.flushSignal()
 	}
+
+	timepoints = append(timepoints, &timepoint{name: "flush_signaled", t: time.Now()})
 
 	if c.trace {
 		client.traceOutOp(string(mh[:len(mh)-LEN_CR_LF]), nil)
@@ -1622,6 +1648,19 @@ func (c *client) prepMsgHeader() []byte {
 
 // processMsg is called to process an inbound msg from a client.
 func (c *client) processMsg(msg []byte) {
+	var timepoints []*timepoint
+	timepoints = append(timepoints, &timepoint{name: "begin", t: time.Now()})
+	defer func() {
+		timepoints = append(timepoints, &timepoint{name: "end", t: time.Now()})
+		totalTime := timepoints[len(timepoints)-1].t.Sub(timepoints[0].t)
+		if totalTime.Nanoseconds() > slowMessageNanoseconds {
+			logMsg := fmt.Sprintf("total: %s", totalTime.String())
+			for i := 1; i < len(timepoints); i++ {
+				logMsg += fmt.Sprintf(", %s->%s: %s", timepoints[i-1].name, timepoints[i].name, timepoints[i].t.Sub(timepoints[i-1].t).String())
+			}
+			c.Noticef("slow process msg: %s", logMsg)
+		}
+	}()
 	// Snapshot server.
 	srv := c.srv
 
@@ -1669,6 +1708,8 @@ func (c *client) processMsg(msg []byte) {
 		c.in.genid = genid
 	}
 
+	timepoints = append(timepoints, &timepoint{name: "prepared", t: time.Now()})
+
 	if !ok {
 		subject := string(c.pa.subject)
 		r = srv.sl.Match(subject)
@@ -1684,6 +1725,8 @@ func (c *client) processMsg(msg []byte) {
 			}
 		}
 	}
+
+	timepoints = append(timepoints, &timepoint{name: "matched", t: time.Now()})
 
 	// This is the fanout scale.
 	fanout := len(r.psubs) + len(r.qsubs)
@@ -1736,6 +1779,8 @@ func (c *client) processMsg(msg []byte) {
 		c.deliverMsg(sub, mh, msg)
 	}
 
+	timepoints = append(timepoints, &timepoint{name: "normal_delivered", t: time.Now()})
+
 	// Check to see if we have our own rand yet. Global rand
 	// has contention with lots of clients, etc.
 	if c.in.prand == nil {
@@ -1758,6 +1803,8 @@ func (c *client) processMsg(msg []byte) {
 			}
 		}
 	}
+
+	timepoints = append(timepoints, &timepoint{name: "group_delivered", t: time.Now()})
 }
 
 func (c *client) pubPermissionViolation(subject []byte) {
