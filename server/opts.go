@@ -92,6 +92,7 @@ type Options struct {
 	RQSubsSweep      time.Duration `json:"-"`
 	MaxClosedClients int           `json:"-"`
 	LameDuckDuration time.Duration `json:"-"`
+	SublistCacheSize int           `json:"sublist_cache_size"`
 
 	CustomClientAuthentication Authentication `json:"-"`
 	CustomRouterAuthentication Authentication `json:"-"`
@@ -1080,6 +1081,9 @@ func processOptions(opts *Options) {
 	}
 	if opts.LameDuckDuration == 0 {
 		opts.LameDuckDuration = DEFAULT_LAME_DUCK_DURATION
+	}
+	if opts.SublistCacheSize == 0 {
+		opts.SublistCacheSize = 1024
 	}
 }
 
