@@ -134,7 +134,7 @@ type client struct {
 	stats
 	mpay  int64
 	msubs int
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	typ   int
 	cid   uint64
 	opts  clientOpts
@@ -1671,21 +1671,21 @@ func (c *client) processMsg(msg []byte) {
 			if rmap == nil {
 				rmap = make(map[string]struct{}, len(srv.routes))
 			}
-			sub.client.mu.Lock()
+			sub.client.mu.RLock()
 			if sub.client.nc == nil ||
 				sub.client.route == nil ||
 				sub.client.route.remoteID == "" {
+				sub.client.mu.RUnlock()
 				c.Debugf("Bad or Missing ROUTER Identity, not processing msg")
-				sub.client.mu.Unlock()
 				continue
 			}
-			if _, ok := rmap[sub.client.route.remoteID]; ok {
+			remoteID := sub.client.route.remoteID
+			sub.client.mu.RUnlock()
+			if _, ok := rmap[remoteID]; ok {
 				c.Debugf("Ignoring route, already processed and sent msg")
-				sub.client.mu.Unlock()
 				continue
 			}
-			rmap[sub.client.route.remoteID] = routeSeen
-			sub.client.mu.Unlock()
+			rmap[remoteID] = routeSeen
 		}
 		// Normal delivery
 		mh := c.msgHeader(msgh[:si], sub)
