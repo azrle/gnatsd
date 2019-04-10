@@ -185,6 +185,7 @@ func New(opts *Options) *Server {
 		start:      now,
 		configTime: now,
 	}
+	s.sl.SetMaxCacheSize(int32(opts.SublistCacheSize))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

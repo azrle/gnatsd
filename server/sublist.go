@@ -40,8 +40,6 @@ var (
 )
 
 const (
-	// cacheMax is used to bound limit the frontend cache
-	slCacheMax = 1024
 	// If we run a sweeper we will drain to this count.
 	slCacheSweep = 512
 	// plistMin is our lower bounds to create a fast plist for Match.
@@ -67,6 +65,8 @@ type Sublist struct {
 	cacheNum  int32
 	ccSweep   int32
 	count     uint32
+	// maxSize is used to bound limit the frontend cache
+	maxSize int32
 }
 
 // A node contains subscriptions and a pointer to the next level.
@@ -97,6 +97,12 @@ func newLevel() *level {
 // New will create a default sublist
 func NewSublist() *Sublist {
 	return &Sublist{root: newLevel()}
+}
+
+// SetMaxCacheSize sets a soft max limit of the cache size.
+// If size is not positive, the cache will be disabled.
+func (s *Sublist) SetMaxCacheSize(maxCacheSize int32) {
+	s.maxSize = maxCacheSize
 }
 
 // Insert adds a subscription into the sublist
@@ -188,7 +194,9 @@ func (s *Sublist) Insert(sub *subscription) error {
 	s.count++
 	s.inserts++
 
-	s.addToCache(subject, sub)
+	if s.maxSize > 0 {
+		s.addToCache(subject, sub)
+	}
 	atomic.AddUint64(&s.genid, 1)
 
 	s.Unlock()
@@ -273,9 +281,11 @@ func (s *Sublist) Match(subject string) *SublistResult {
 	atomic.AddUint64(&s.matches, 1)
 
 	// Check cache first.
-	if r, ok := s.cache.Load(subject); ok {
-		atomic.AddUint64(&s.cacheHits, 1)
-		return r.(*SublistResult)
+	if s.maxSize > 0 {
+		if r, ok := s.cache.Load(subject); ok {
+			atomic.AddUint64(&s.cacheHits, 1)
+			return r.(*SublistResult)
+		}
 	}
 
 	tsa := [32]string{}
@@ -292,17 +302,19 @@ func (s *Sublist) Match(subject string) *SublistResult {
 	// FIXME(dlc) - Make shared pool between sublist and client readLoop?
 	result := &SublistResult{}
 
-	// Get result from the main structure and place into the shared cache.
-	// Hold the read lock to avoid race between match and store.
-	s.RLock()
-	matchLevel(s.root, tokens, result)
-	s.cache.Store(subject, result)
-	n := atomic.AddInt32(&s.cacheNum, 1)
-	s.RUnlock()
+	if s.maxSize > 0 {
+		// Get result from the main structure and place into the shared cache.
+		// Hold the read lock to avoid race between match and store.
+		s.RLock()
+		matchLevel(s.root, tokens, result)
+		s.cache.Store(subject, result)
+		n := atomic.AddInt32(&s.cacheNum, 1)
+		s.RUnlock()
 
-	// Reduce the cache count if we have exceeded our set maximum.
-	if n > slCacheMax && atomic.CompareAndSwapInt32(&s.ccSweep, 0, 1) {
-		go s.reduceCacheCount()
+		// Reduce the cache count if we have exceeded our set maximum.
+		if n > s.maxSize && atomic.CompareAndSwapInt32(&s.ccSweep, 0, 1) {
+			go s.reduceCacheCount()
+		}
 	}
 
 	return result
@@ -470,7 +482,9 @@ func (s *Sublist) remove(sub *subscription, shouldLock bool) error {
 			l.pruneNode(n, t)
 		}
 	}
-	s.removeFromCache(subject, sub)
+	if s.maxSize > 0 {
+		s.removeFromCache(subject, sub)
+	}
 	atomic.AddUint64(&s.genid, 1)
 
 	return nil
