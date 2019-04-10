@@ -69,7 +69,7 @@ const (
 	tracerPrefix       = "tracer"
 )
 
-const slowMessageNanoseconds = 500000 // 0.5 ms
+const slowMessageNanoseconds = 2000000 // 2 ms
 
 // Represent client booleans with a bitmask
 type clientFlag byte
@@ -1658,7 +1658,7 @@ func (c *client) processMsg(msg []byte) {
 			for i := 1; i < len(timepoints); i++ {
 				logMsg += ", " + timepoints[i-1].name + "->" + timepoints[i].name + ": " + timepoints[i].t.Sub(timepoints[i-1].t).String()
 			}
-			c.Noticef("slow deliver msg to [%s]: %s", string(c.pa.subject), logMsg)
+			c.Noticef("slow process msg to [%s]: %s", string(c.pa.subject), logMsg)
 		}
 	}()
 	// Snapshot server.
@@ -1777,9 +1777,8 @@ func (c *client) processMsg(msg []byte) {
 		// Normal delivery
 		mh := c.msgHeader(msgh[:si], sub)
 		c.deliverMsg(sub, mh, msg)
+		timepoints = append(timepoints, &timepoint{name: "normal_delivered", t: time.Now()})
 	}
-
-	timepoints = append(timepoints, &timepoint{name: "normal_delivered", t: time.Now()})
 
 	// Check to see if we have our own rand yet. Global rand
 	// has contention with lots of clients, etc.
