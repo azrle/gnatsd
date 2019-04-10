@@ -1669,7 +1669,7 @@ func (c *client) processMsg(msg []byte) {
 		if sub.client.typ == ROUTER {
 			// Check to see if we have already sent it here.
 			if rmap == nil {
-				rmap = make(map[string]struct{}, srv.numRoutes())
+				rmap = make(map[string]struct{}, len(srv.routes))
 			}
 			sub.client.mu.Lock()
 			if sub.client.nc == nil ||
