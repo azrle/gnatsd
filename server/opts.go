@@ -1083,7 +1083,7 @@ func processOptions(opts *Options) {
 		opts.LameDuckDuration = DEFAULT_LAME_DUCK_DURATION
 	}
 	if opts.SublistCacheSize == 0 {
-		opts.SublistCacheSize = 1024
+		opts.SublistCacheSize = DEFAULT_SUBLIST_CACHE_SIZE
 	}
 }
 

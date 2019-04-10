@@ -302,14 +302,14 @@ func (s *Sublist) Match(subject string) *SublistResult {
 	// FIXME(dlc) - Make shared pool between sublist and client readLoop?
 	result := &SublistResult{}
 
+	// Get result from the main structure and place into the shared cache.
+	// Hold the read lock to avoid race between match and store.
+	s.RLock()
+	matchLevel(s.root, tokens, result)
+	s.RUnlock()
 	if s.maxSize > 0 {
-		// Get result from the main structure and place into the shared cache.
-		// Hold the read lock to avoid race between match and store.
-		s.RLock()
-		matchLevel(s.root, tokens, result)
 		s.cache.Store(subject, result)
 		n := atomic.AddInt32(&s.cacheNum, 1)
-		s.RUnlock()
 
 		// Reduce the cache count if we have exceeded our set maximum.
 		if n > s.maxSize && atomic.CompareAndSwapInt32(&s.ccSweep, 0, 1) {

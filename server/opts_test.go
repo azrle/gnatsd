@@ -57,6 +57,7 @@ func TestDefaultOptions(t *testing.T) {
 		RQSubsSweep:      DEFAULT_REMOTE_QSUBS_SWEEPER,
 		MaxClosedClients: DEFAULT_MAX_CLOSED_CLIENTS,
 		LameDuckDuration: DEFAULT_LAME_DUCK_DURATION,
+		SublistCacheSize: DEFAULT_SUBLIST_CACHE_SIZE,
 	}
 
 	opts := &Options{}

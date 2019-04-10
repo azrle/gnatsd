@@ -310,6 +310,8 @@ func TestSublistCache(t *testing.T) {
 	r = s.Match(subject)
 	verifyLen(r.psubs, 0, t)
 
+	slCacheMax := 1024
+	s.SetMaxCacheSize(int32(slCacheMax))
 	for i := 0; i < 2*slCacheMax; i++ {
 		s.Match(fmt.Sprintf("foo-%d\n", i))
 	}
@@ -1071,6 +1073,8 @@ func cacheContentionTest(b *testing.B, numMatchers, numAdders, numRemovers int) 
 	mu.Unlock()
 
 	// Now warm up the cache
+	slCacheMax := 1024
+	s.SetMaxCacheSize(int32(slCacheMax))
 	for i := 0; i < slCacheMax; i++ {
 		s.Match(fmt.Sprintf("foo.bar.baz.%d", i))
 	}
