@@ -907,7 +907,7 @@ func (s *Server) broadcastInterestToRoutes(sub *subscription, proto string) {
 	}
 	protoAsBytes := []byte(proto)
 	checkPerms := true
-	s.mu.Lock()
+	s.mu.RLock()
 	for _, route := range s.routes {
 		// FIXME(dlc) - Make same logic as deliverMsg
 		route.mu.Lock()
@@ -926,15 +926,12 @@ func (s *Server) broadcastInterestToRoutes(sub *subscription, proto string) {
 		route.mu.Unlock()
 		route.traceOutOp("", arg)
 	}
-	s.mu.Unlock()
+	s.mu.RUnlock()
 }
 
 // broadcastSubscribe will forward a client subscription
 // to all active routes.
 func (s *Server) broadcastSubscribe(sub *subscription) {
-	if s.numRoutes() == 0 {
-		return
-	}
 	rsid := routeSid(sub)
 	proto := fmt.Sprintf(subProto, sub.subject, sub.queue, rsid)
 	s.broadcastInterestToRoutes(sub, proto)
@@ -943,13 +940,10 @@ func (s *Server) broadcastSubscribe(sub *subscription) {
 // broadcastUnSubscribe will forward a client unsubscribe
 // action to all active routes.
 func (s *Server) broadcastUnSubscribe(sub *subscription) {
-	if s.numRoutes() == 0 {
-		return
-	}
-	sub.client.mu.Lock()
+	sub.client.mu.RLock()
 	// Max has no meaning on the other side of a route, so do not send.
 	hasMax := sub.max > 0 && sub.nm < sub.max
-	sub.client.mu.Unlock()
+	sub.client.mu.RUnlock()
 	if hasMax {
 		return
 	}
