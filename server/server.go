@@ -71,7 +71,7 @@ type Info struct {
 type Server struct {
 	gcid uint64
 	stats
-	mu            sync.Mutex
+	mu            sync.RWMutex
 	info          Info
 	sl            *Sublist
 	configFile    string
